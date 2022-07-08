@@ -1,103 +1,73 @@
+import Notiflix from 'notiflix';
+import renderMarkup from './fetchData';
 import './css/styles.css';
-import { Notify } from 'notiflix/build/notiflix-notify-aio';
-import axios from 'axios';
+import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-import { GetPixabayApi } from './fetchAPI';
 
-Notify.init({
-    position:'center-top',
-    timeout: 2000,
-    cssAnimationStyle: 'from-top',
-    showOnlyTheLastOne: true,
-})
+export const refs = {
+  gallery: document.querySelector('.gallery'),
+  form: document.querySelector('#search-form'),
+  input: document.querySelector('input'),
+  searchBtn: document.querySelector('#search-form button'),
+  btnLoadMore: document.querySelector('.load-more'),
+  btnSearchAnchor: document.querySelector('.searchAnchor'),
+  
+};
+export let page = 1;
+export let query = '';
+let gallery = {};
+const onQuerySubmit = async event => {
+  event.preventDefault();
 
-const galleryRef = document.querySelector('.gallery');
-const formRef = document.querySelector('.search-form');
-const buttonRef = document.querySelector('.load-more');
+  if (query !== event.target[0].value) {
 
-formRef.addEventListener('submit', onFormSubmit);
-buttonRef.addEventListener('click', onLoadMore);
+    refs.btnLoadMore.classList.add('hidden');
+    refs.btnSearchAnchor.classList.add('hidden');
+    refs.gallery.textContent = '';
+    page = 1;
+  }
+  query = event.target[0].value.trim();
 
-const getPixabayApi = new GetPixabayApi();
+  if (query === '') {
+    Notiflix.Notify.failure('Please enter some query');
+    return;
+  }
+  await renderMarkup();
 
+  gallery = new SimpleLightbox('.gallery .photo-card a');
+  gallery.on('show.simplelightbox');
 
-function makeGalleryMarkup(searchedImages) {
-  return searchedImages
-  .map(
-    ({
-    webformatURL,
-    largeImageURL,
-    tags,
-    likes,
-    vievs,
-    comments,
-    downloads,
-}) => `<div class="photo-card">
-<a href="${largeImageURL}">
-<img src="${webformatURL}" alt="${tags}" loading="lazy" />
-<div class="info">
-  <p class="info-item">
-    <b>Likes: ${likes}</b>
-  </p>
-  <p class="info-item">
-    <b>Views: ${vievs}</b>
-  </p>
-  <p class="info-item">
-    <b>Comments: ${comments}</b>
-  </p>
-  <p class="info-item">
-    <b>Downloads: ${downloads}</b>
-  </p>
-</div>
-</a>
-</div>`
-)
-.join('');
-}
+  refs.searchBtn.setAttribute('disabled', 'disabled');
+  refs.btnLoadMore.removeAttribute('disabled');
 
-function renderGallery(searchedImages) {
- galleryRef.insertAdjacentHTML('beforeend', makeGalleryMarkup(searchedImages));
-}
+  page += 1;
+};
 
-async function onFormSubmit(event) {
-    event.preventDefault();
-    clearGallery();
-    getPixabayApi.resetPage();
-    const request = event.target.elements.searchQuery.value.trim();
-    if(!request) {return Notify.info("Input some to search")}
-   
-    
-   getPixabayApi.searchQueryRequest = request;
-   try {
-    const {hits,totalHits} = await getPixabayApi.fetchImg();
-    if(!totalHits) {
-        return Notify.warning("Sorry, there are no images matching your search query. Please try again.")}
-    Notify.success(`Hooray! We found ${totalHits} images.`);
-    renderGallery(hits);
-    // lightbox.refresh();
-   } catch(error) {console.log(error.message)}
-    
-    
-    event.target.reset();
+refs.input.addEventListener('input', () => {
+  if (refs.input.value !== query) {
+ 
+    refs.searchBtn.removeAttribute('disabled');
+  }
+});
 
+refs.btnLoadMore.addEventListener('click', async event => {
 
-}
+  await renderMarkup();
+  await gallery.refresh();
 
-async function onLoadMore() {
+  setTimeout(() => {
+    page += 1;
+    event.view.scrollBy({
+      top: 1000,
+      behavior: 'smooth',
+    });
+  }, 300);
+});
 
- try{ 
-const {hits,totalHits} = await getPixabayApi.fetchImg();
-renderGallery(hits);
-// lightbox.refresh();
-} catch(error) {console.log(error.message)} 
-}
-
-function clearGallery() {
-galleryRef.innerHTML = "";
-
-}
-
-// const lightbox = new SimpleLightbox('.gallery a', {
-//    captionsData:'alt',
-//    captionDelay: 300,  
-//      });
+refs.btnSearchAnchor.addEventListener('click', event => {
+  event.view.scroll({
+    top: 0,
+    behavior: 'smooth',
+  });
+});
+refs.form.addEventListener('submit', onQuerySubmit);
